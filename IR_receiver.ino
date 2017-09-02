@@ -1,15 +1,10 @@
-#ifdef P2
     int irPin = P2; //IR detector connected to digital 2
-#else
-    int irPin = 2;  //IR detector connected to digital 2
-    #define LED_BUILTIN 1
-#endif
+
     const byte BIT_PER_BLOCK = 32;
      
-    void setup() {
+    void ir_setup() {
       pinMode(irPin, INPUT);
       pinMode(LED_BUILTIN, OUTPUT);
-      Serial.begin(9600);
       flash();
       flash();
     }
@@ -108,15 +103,48 @@ void bose(int b) {
   }
 }
 
-void loop() {
-        int pulse_len = pulseIn(irPin, HIGH);
+int prev_ir = LOW;
+auto prev_time = micros();
+
+int sig=0;
+unsigned long signals[1000];
+
+void ir_loop() {
+/*        int pulse_len = pulseIn(irPin, HIGH);
 
         int out = 0;
         if (pulse_len > 4000) bose(2);
         else if (pulse_len > 1000) bose(1);
         else if (pulse_len > 100 ) bose(0);
+*/
+    int ir = digitalRead(irPin);
+    auto now = micros();
+    if (sig < 1000 && ir != prev_ir) {
+      auto len = now - prev_time;
+      if (len < 1000000) signals[sig++] = len;
+      prev_ir = ir;
+      prev_time = now;
+      digitalWrite(LED_BUILTIN, ir);
+    }
 
-        digitalWrite(LED_BUILTIN, pulse_len > 1000);
+    if (now - prev_time > 2000000) {
+      if (sig && serverClient && serverClient.connected()) {  // send data to Client
+        serverClient.print("IR: n=");
+        serverClient.println(sig);
+        serverClient.print(" ==> ");
+        for (int i = 0; i < sig ; i++) {
+          serverClient.print(" ");
+          serverClient.print(signals[i]);
+          if (i<sig-1 && signals[i] > 15000) {
+            serverClient.println();
+            serverClient.print(" ==> ");
+          }
+        }
+        serverClient.println();
+       //serverClient.println(digitalRead(irPin));
+      }
+      sig = 0;
+    }
 }
 
 void loopy() {

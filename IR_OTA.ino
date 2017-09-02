@@ -10,29 +10,18 @@ const char* password = "ffffffffee";
 
 const int ESP_BUILTIN_LED = LED_BUILTIN;
 
+// declare telnet server (do NOT put in setup())
+WiFiServer telnetServer(23);
+WiFiClient serverClient;
 
 #include <Ticker.h>
 
 Ticker flipper;
 
-int count = 0;
-
 void flip()
 {
   int state = digitalRead(LED_BUILTIN);  // get the current state of LED pin
   digitalWrite(LED_BUILTIN, !state);     // set pin to the opposite state
-  
-  ++count;
-  // when the counter reaches a certain value, start blinking like crazy
-  if (count == 20)
-  {
-    flipper.attach(0.1, flip);
-  }
-  // when the counter reaches yet another value, stop blinking
-  else if (count == 120)
-  {
-    flipper.detach();
-  }
 }
 
 void setup() {
@@ -63,7 +52,9 @@ void setup() {
   });
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
     Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    flipper.attach(1.1 - (progress/total), flip);
   });
+  
   ArduinoOTA.onError([](ota_error_t error) {
     Serial.printf("Error[%u]: ", error);
     if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
@@ -71,12 +62,17 @@ void setup() {
     else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
     else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
     else if (error == OTA_END_ERROR) Serial.println("End Failed");
+    flipper.attach(0.1, flip);
   });
+
   ArduinoOTA.begin();
   Serial.println("Ready");
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
   pinMode(ESP_BUILTIN_LED, OUTPUT);
+
+  telnet_setup();
+  ir_setup();
 
   // flip the pin every 0.3s
   flipper.attach(0.3, flip);
@@ -85,6 +81,8 @@ void setup() {
 
 void loop() {
   ArduinoOTA.handle();
+  telnet_loop();
+  ir_loop();
 /*  digitalWrite(ESP_BUILTIN_LED, LOW);
   delay(100);
   digitalWrite(ESP_BUILTIN_LED, HIGH);
