@@ -1,13 +1,33 @@
     int irPin = P2; //IR detector connected to digital 2
 
     const byte BIT_PER_BLOCK = 32;
-     
-    void ir_setup() {
+
+auto prev_time = micros();
+int head=0;
+int tail=0;
+unsigned long signals[1000];
+
+void handleInterrupt()
+{
+    auto now = micros();
+    auto next = (tail + 1 ) % 1000;
+    auto len = now - prev_time;
+    signals[tail] = len;
+    tail = next;
+    if (next == head) {
+      head = (head + 1) % 1000 ;
+    }
+    prev_time = now;
+    digitalWrite(LED_BUILTIN, digitalRead(irPin));
+}
+
+void ir_setup() {
       pinMode(irPin, INPUT);
       pinMode(LED_BUILTIN, OUTPUT);
       flash();
       flash();
-    }
+      attachInterrupt(irPin, handleInterrupt, CHANGE);
+}
 
   void flash() {
     digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
@@ -104,10 +124,6 @@ void bose(int b) {
 }
 
 int prev_ir = LOW;
-auto prev_time = micros();
-
-int sig=0;
-unsigned long signals[1000];
 
 void ir_loop() {
 /*        int pulse_len = pulseIn(irPin, HIGH);
@@ -117,34 +133,21 @@ void ir_loop() {
         else if (pulse_len > 1000) bose(1);
         else if (pulse_len > 100 ) bose(0);
 */
-    int ir = digitalRead(irPin);
-    auto now = micros();
-    if (sig < 1000 && ir != prev_ir) {
-      auto len = now - prev_time;
-      if (len < 1000000) signals[sig++] = len;
-      prev_ir = ir;
-      prev_time = now;
-      digitalWrite(LED_BUILTIN, ir);
-    }
-
-    if (now - prev_time > 2000000) {
-      if (sig && serverClient && serverClient.connected()) {  // send data to Client
-        serverClient.print("IR: n=");
-        serverClient.println(sig);
-        serverClient.print(" ==> ");
-        for (int i = 0; i < sig ; i++) {
-          serverClient.print(" ");
-          serverClient.print(signals[i]);
-          if (i<sig-1 && signals[i] > 15000) {
-            serverClient.println();
-            serverClient.print(" ==> ");
-          }
-        }
+  if (serverClient && serverClient.connected()) {  // send data to Client
+    while( head != tail ) {
+      noInterrupts();
+      auto sig = signals[head];
+      head = (head + 1) % 1000;
+      interrupts();
+      
+      serverClient.print(" ");
+      serverClient.print(sig);
+      if (sig > 15000) {
         serverClient.println();
-       //serverClient.println(digitalRead(irPin));
+        serverClient.print(" ==> ");
       }
-      sig = 0;
     }
+  }
 }
 
 void loopy() {
