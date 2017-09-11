@@ -73,6 +73,7 @@ void setup() {
 
   telnet_setup();
   ir_setup();
+  tx_setup();
 
   // flip the pin every 0.3s
   flipper.attach(0.3, flip);
@@ -83,6 +84,7 @@ void loop() {
   ArduinoOTA.handle();
   telnet_loop();
   ir_loop();
+  tx_loop();
 /*  digitalWrite(ESP_BUILTIN_LED, LOW);
   delay(100);
   digitalWrite(ESP_BUILTIN_LED, HIGH);
